@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.venv
+env/
+venv/
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Local development
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+*.pdf
+*.txt
+!requirements.txt
+
+# ChromeDriver
+chromedriver.exe
+chromedriver
+
+# Reports
+gdpr_audit_reports/
