@@ -154,12 +154,16 @@ class GDPRComplianceChecker:
         """Generate a PDF report from the check results"""
         return self.pdf_generator.generate_report(report)
     
-    def cleanup(self):
-        """Clean up resources"""
-        self.web_driver_service.quit_driver()
-
 def main():
     """Main application entry point"""
+    # Set page config must be the first Streamlit command
+    st.set_page_config(
+        page_title="Health Tech Privacy Compliance",
+        page_icon="🏥",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     # Main header with project title
     st.markdown("""
         <div style='text-align: center;'>
