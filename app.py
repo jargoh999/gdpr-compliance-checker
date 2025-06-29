@@ -121,49 +121,50 @@ class GDPRComplianceChecker:
         """Run all GDPR compliance checks"""
         report = GDPRReport(url=url)
         
-        # Initialize WebDriver and run checks
-        with st.spinner("Initializing browser..."):
-            driver = self.web_driver_service.get_driver()
-            self.initialize_checkers(driver)
-        
-        # Run each check
-        for i, checker in enumerate(self.checkers):
-            progress = None
-            progress_text = None
-            try:
-                # Show progress
-                progress = st.progress(0)
-                progress_text = st.empty()
-                progress_text.text(f"Checking: {checker.check_name}")
-                
-                # Run the check
-                with st.spinner(f"Running {checker.check_name}..."):
+        try:
+            # Initialize WebDriver and run checks
+            with st.spinner("Initializing browser..."):
+                driver = self.web_driver_service.get_driver()
+                self.initialize_checkers(driver)
+            
+            # Create a container for progress updates
+            progress_container = st.empty()
+            
+            # Run each check
+            for i, checker in enumerate(self.checkers):
+                try:
+                    # Update progress
+                    with progress_container.container():
+                        st.info(f"Running check {i + 1} of {len(self.checkers)}: {checker.check_name}")
+                        progress_bar = st.progress(0)
+                    
+                    # Run the check
                     result = checker.execute(url)
                     report.add_result(result)
-                
-                # Update progress
-                if progress is not None:
-                    progress.progress((i + 1) / len(self.checkers))
-                
-                # Small delay to prevent overwhelming the browser
-                time.sleep(1)
-                
-            except Exception as e:
-                error_result = GDPRCheckResult(
-                    check_id=checker.check_id,
-                    check_name=checker.check_name,
-                    status="ERROR",
-                    severity="high",
-                    description=f"Error executing check: {str(e)}",
-                    details={"error": str(e)}
-                )
-                report.add_result(error_result)
-            finally:
-                if progress_text is not None:
-                    progress_text.empty()
-                if progress is not None:
-                    progress.empty()
-        
+                    
+                    # Update progress
+                    progress_bar.progress((i + 1) / len(self.checkers))
+                    
+                    # Small delay to prevent overwhelming the browser
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    error_result = GDPRCheckResult(
+                        check_id=checker.check_id,
+                        check_name=checker.check_name,
+                        status="ERROR",
+                        severity="high",
+                        description=f"Error executing check: {str(e)}",
+                        details={"error": str(e)}
+                    )
+                    report.results.append(error_result)
+                    
+            # Clear progress container when done
+            progress_container.empty()
+            
+        except Exception as e:
+            st.error(f"An error occurred during the compliance check: {str(e)}")
+            
         return report
     
     def generate_pdf_report(self, report: GDPRReport) -> bytes:
