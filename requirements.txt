@@ -7,6 +7,6 @@ beautifulsoup4>=4.12.2,<5.0.0
 requests>=2.31.0,<3.0.0
 tldextract>=5.1.1,<6.0.0
 pandas>=2.0.3,<3.0.0
-PyYAML>=5.4.1,<6.0.0  # Downgraded for better compatibility
+ruamel.yaml>=0.18.0,<1.0.0  # Replaced PyYAML with ruamel.yaml
 dnspython>=2.4.2,<3.0.0
 python-whois>=0.9.3,<1.0.0
