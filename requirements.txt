@@ -14,5 +14,4 @@ selenium-wire>=5.1.0,<6.0.0
 webdriver-manager>=3.8.6,<4.0.0
 pyvirtualdisplay>=3.0.0,<4.0.0
 xvfbwrapper>=0.2.9,<1.0.0
-pyppeteer>=1.0.2,<2.0.0
-playwright>=1.35.0,<2.0.0
+playwright>=1.35.0,<1.40.0  # Using a specific range to avoid dependency conflicts

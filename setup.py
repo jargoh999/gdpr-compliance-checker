@@ -8,13 +8,25 @@ class PostInstallCommand(install):
     """Post-installation for installation mode."""
     def run(self):
         install.run(self)
-        # Install Chrome and ChromeDriver
-        if os.name == 'posix' and not os.path.exists('/.dockerenv'):
+        # Install Playwright browsers
+        if os.name == 'posix':
             try:
-                subprocess.check_call([sys.executable, '-m', 'playwright', 'install', 'chromium'])
+                # First install dependencies
+                print("Installing Playwright system dependencies...")
                 subprocess.check_call([sys.executable, '-m', 'playwright', 'install-deps'])
+                
+                # Then install browsers
+                print("Installing Playwright browsers...")
+                subprocess.check_call([sys.executable, '-m', 'playwright', 'install', 'chromium'])
+                
+                # Install the browser binaries
+                print("Installing Playwright browser binaries...")
+                subprocess.check_call([sys.executable, '-m', 'playwright', 'install'])
+                
             except subprocess.CalledProcessError as e:
                 print(f"Warning: Failed to install Playwright browsers: {e}")
+                print("You may need to install the browsers manually with:")
+                print("  python -m playwright install")
 
 setup(
     name="gdpr-compliance-checker",
