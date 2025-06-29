@@ -30,7 +30,7 @@ from components import (
     ConsentManagementChecker
 )
 
-# Page config
+# Page config must be the first Streamlit command and only called once
 st.set_page_config(
     page_title="Health Tech Privacy Compliance",
     page_icon="🏥",
@@ -156,14 +156,6 @@ class GDPRComplianceChecker:
     
 def main():
     """Main application entry point"""
-    # Set page config must be the first Streamlit command
-    st.set_page_config(
-        page_title="Health Tech Privacy Compliance",
-        page_icon="🏥",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
     # Main header with project title
     st.markdown("""
         <div style='text-align: center;'>
