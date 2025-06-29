@@ -61,12 +61,32 @@ apt-get install -qqy --no-install-recommends \
 
 # Install Chrome
 echo "Installing Google Chrome..."
+# Install required dependencies
+apt-get update -qqy
+apt-get install -y wget gnupg2
+
+# Add Google Chrome repository
 wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update -qqy \
-    && apt-get install -qqy google-chrome-stable \
-    && rm /etc/apt/sources.list.d/google-chrome.list \
-    && rm -rf /var/lib/apt/lists/*
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+
+# Install Chrome
+apt-get update -qqy
+apt-get install -y google-chrome-stable
+
+# Verify installation
+if ! command -v google-chrome &> /dev/null; then
+    echo "Google Chrome installation failed, trying alternative method..."
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    apt-get install -y ./google-chrome-stable_current_amd64.deb
+    rm google-chrome-stable_current_amd64.deb
+fi
+
+# Clean up
+rm -f /etc/apt/sources.list.d/google-chrome.list
+rm -rf /var/lib/apt/lists/*
+
+# Verify Chrome installation
+echo "Chrome version: $(google-chrome --version || echo 'Chrome not found')"
 
 # Set display port and dbus env to avoid hanging
 export DISPLAY=:99.0
