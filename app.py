@@ -3,9 +3,17 @@ import os
 import sys
 import time
 import tempfile
-import streamlit as st
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+
+import streamlit as st
+
+# Set page config must be the very first Streamlit command
+st.set_page_config(
+    page_title="Health Tech Privacy Compliance",
+    page_icon="🏥",
+    layout="wide"
+)
 
 # Add the project root to the Python path
 project_root = str(Path(__file__).parent.absolute())
@@ -28,14 +36,6 @@ from components import (
     InternationalTransferChecker,
     DataBreachChecker,
     ConsentManagementChecker
-)
-
-# Page config must be the first Streamlit command and only called once
-st.set_page_config(
-    page_title="Health Tech Privacy Compliance",
-    page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
 )
 
 # Custom CSS
