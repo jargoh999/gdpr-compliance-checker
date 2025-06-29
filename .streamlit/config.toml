@@ -1,0 +1,35 @@
+[server]
+# Increase the maximum file watcher limit
+fileWatcherType = "none"
+# Disable telemetry
+gatherUsageStats = false
+# Disable CORS for local development
+enableCORS = false
+# Disable XSRF protection for local development
+enableXsrfProtection = false
+
+[browser]
+# Disable the file watcher to avoid inotify limits
+serverAddress = "0.0.0.0"
+serverPort = 8501
+
+[runner]
+# Disable the file watcher to avoid inotify limits
+magicEnabled = false
+
+[scheduler]
+# Disable the file watcher to avoid inotify limits
+enabled = false
+
+[global]
+# Disable the file watcher to avoid inotify limits
+developmentMode = false
+
+[theme]
+# Set the default theme
+base="light"
+primaryColor="#FF4B4B"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F0F2F6"
+textColor="#262730"
+font="sans serif"

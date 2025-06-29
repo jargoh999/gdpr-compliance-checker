@@ -1,11 +1,13 @@
 """WebDriver service for Selenium browser automation"""
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import WebDriverException
+import sys
 from typing import Optional, Dict, Any
+from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
+
+# Import our utility functions
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.web_driver_utils import get_webdriver, close_webdriver, get_chrome_options
 
 from config.constants import BROWSER_OPTIONS
 
@@ -25,25 +27,22 @@ class WebDriverService:
         """Start a new Chrome WebDriver instance
         
         Args:
-            options: Additional options to override defaults
+            options: Additional options to override defaults (not used in this implementation)
             
         Returns:
             webdriver.Chrome: Configured Chrome WebDriver instance
         """
         if self.driver:
             self.quit_driver()
-            
-        chrome_options = self._get_chrome_options(options)
         
         try:
-            # Use webdriver-manager to handle ChromeDriver
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            # Use our utility function to get a properly configured WebDriver
+            self.driver = get_webdriver()
             return self.driver
-        except WebDriverException as e:
+        except Exception as e:
             raise RuntimeError(f"Failed to start WebDriver: {str(e)}")
     
-    def _get_chrome_options(self, custom_options: Optional[Dict[str, Any]] = None) -> Options:
+    def _get_chrome_options(self, custom_options: Optional[Dict[str, Any]] = None):
         """Get Chrome options with default and custom settings
         
         Args:
@@ -52,31 +51,17 @@ class WebDriverService:
         Returns:
             Options: Configured Chrome options
         """
-        options = Options()
+        # Use our utility function to get base options
+        options = get_chrome_options()
         
-        # Set default options
-        for option, value in BROWSER_OPTIONS.items():
-            options.add_argument(f"--{option}={value}")
-        
-        # Apply headless mode if specified
-        if self.headless:
-            options.add_argument('--headless')
-        
-        # Apply custom options
+        # Apply any custom options if provided
         if custom_options:
-            for option, value in custom_options.items():
-                if option.startswith('--'):
-                    options.add_argument(f"{option}={value}")
-                else:
-                    options.add_argument(f"--{option}={value}")
+            for key, value in custom_options.items():
+                if key.startswith('--'):
+                    options.add_argument(f"{key}={value}" if value else key)
         
-        # Disable automation flags
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        
-        # Disable password manager and infobars
-        prefs = {
-            'credentials_enable_service': False,
+        return options
+            
             'profile.password_manager_enabled': False,
             'profile.default_content_setting_values.notifications': 2
         }
@@ -101,9 +86,9 @@ class WebDriverService:
         """Quit the current WebDriver instance if it exists"""
         if self.driver:
             try:
-                self.driver.quit()
-            except Exception:
-                pass  # Ignore errors when quitting
+                close_webdriver(self.driver)
+            except Exception as e:
+                print(f"Error closing WebDriver: {str(e)}")
             finally:
                 self.driver = None
     
