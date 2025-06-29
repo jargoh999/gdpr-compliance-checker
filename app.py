@@ -6,14 +6,24 @@ import tempfile
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
+# Import streamlit first and configure it
 import streamlit as st
 
-# Set page config must be the very first Streamlit command
+# Set page config - must be the first Streamlit command
 st.set_page_config(
     page_title="Health Tech Privacy Compliance",
     page_icon="🏥",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Initialize session state
+if 'report' not in st.session_state:
+    st.session_state.report = None
+if 'report_generated' not in st.session_state:
+    st.session_state.report_generated = False
+if 'pdf_bytes' not in st.session_state:
+    st.session_state.pdf_bytes = None
 
 # Add the project root to the Python path
 project_root = str(Path(__file__).parent.absolute())
@@ -167,14 +177,6 @@ def main():
         </div>
         <hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>
     """, unsafe_allow_html=True)
-    
-    # Initialize session state
-    if 'report' not in st.session_state:
-        st.session_state.report = None
-    if 'report_generated' not in st.session_state:
-        st.session_state.report_generated = False
-    if 'pdf_bytes' not in st.session_state:
-        st.session_state.pdf_bytes = None
     
     # Sidebar
     st.sidebar.markdown("""
