@@ -46,6 +46,7 @@ venv/
 *.pdf
 *.txt
 !requirements.txt
+!runtime.txt
 
 # ChromeDriver
 chromedriver.exe
