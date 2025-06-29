@@ -54,18 +54,23 @@ class WebDriverService:
         # Use our utility function to get base options
         options = get_chrome_options()
         
+        # Set Chrome preferences
+        prefs = {
+            'profile.password_manager_enabled': False,
+            'profile.default_content_setting_values.notifications': 2
+        }
+        
+        # Add any custom preferences if provided
+        if custom_options and 'prefs' in custom_options:
+            prefs.update(custom_options['prefs'])
+            
+        options.add_experimental_option('prefs', prefs)
+        
         # Apply any custom options if provided
         if custom_options:
             for key, value in custom_options.items():
                 if key.startswith('--'):
                     options.add_argument(f"{key}={value}" if value else key)
-        
-        return options
-            
-            'profile.password_manager_enabled': False,
-            'profile.default_content_setting_values.notifications': 2
-        }
-        options.add_experimental_option('prefs', prefs)
         
         # Enable performance logging
         options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
