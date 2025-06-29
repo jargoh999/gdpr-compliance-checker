@@ -82,21 +82,52 @@ class WebDriverService:
             if headless and '--headless' not in str(chrome_options.arguments):
                 chrome_options.add_argument('--headless=new')
             
-            # Try to get a WebDriver instance
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=chrome_options
-            )
+            # Try to get a WebDriver instance with Chrome first, then fall back to Chromium
+            chrome_types = [ChromeType.GOOGLE, ChromeType.CHROMIUM]
+            last_error = None
             
-            # Set a reasonable window size
-            self.driver.set_window_size(1920, 1080)
+            for chrome_type in chrome_types:
+                try:
+                    # Try to install the appropriate ChromeDriver
+                    chrome_driver_path = ChromeDriverManager(chrome_type=chrome_type).install()
+                    
+                    # Create the WebDriver
+                    self.driver = webdriver.Chrome(
+                        service=Service(chrome_driver_path),
+                        options=chrome_options
+                    )
+                    
+                    # Set a reasonable window size
+                    self.driver.set_window_size(1920, 1080)
+                    
+                    # Verify the driver is working
+                    self.driver.get('about:blank')
+                    
+                    return {
+                        'success': True,
+                        'driver': self.driver,
+                        'type': 'selenium',
+                        'browser': 'chrome' if chrome_type == ChromeType.GOOGLE else 'chromium'
+                    }
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    logging.warning(f"Failed to start {chrome_type} WebDriver: {last_error}")
+                    
+                    # Clean up if driver was partially created
+                    if hasattr(self, 'driver') and self.driver:
+                        try:
+                            self.driver.quit()
+                        except:
+                            pass
+                        self.driver = None
             
-            # Verify the driver is working
-            self.driver.get('about:blank')
+            # If we get here, all Chrome/Chromium attempts failed
+            raise RuntimeError(f"Failed to start any Chrome/Chromium WebDriver. Last error: {last_error}")
             
             return {
-                'success': True,
-                'driver': self.driver,
+                'success': False,
+                'error': last_error or 'Unknown error',
                 'type': 'selenium',
                 'headless': headless
             }
@@ -123,24 +154,59 @@ class WebDriverService:
     def _try_start_playwright(self) -> dict:
         """Attempt to start a Playwright instance as a fallback."""
         try:
-            from playwright.sync_api import sync_playwright
+            import sys
+            import subprocess
             
+            # Ensure Playwright is installed
+            try:
+                from playwright.sync_api import sync_playwright
+            except ImportError:
+                logging.info("Playwright not found, installing...")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
+                subprocess.check_call([sys.executable, "-m", "playwright", "install-deps"])
+                subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                from playwright.sync_api import sync_playwright
+            
+            # Try to start Playwright with Chromium
             playwright = sync_playwright().start()
-            browser = playwright.chromium.launch(headless=True)
-            context = browser.new_context(viewport={'width': 1920, 'height': 1080})
-            page = context.new_page()
             
-            # Verify the browser is working
-            page.goto('about:blank')
+            # Try with Chromium first, fall back to WebKit if needed
+            browsers_to_try = ['chromium', 'webkit']
+            last_error = None
             
-            return {
-                'success': True,
-                'driver': browser,
-                'context': context,
-                'page': page,
-                'type': 'playwright',
-                'headless': True
-            }
+            for browser_type_name in browsers_to_try:
+                try:
+                    browser_type = getattr(playwright, browser_type_name)
+                    browser = browser_type.launch(headless=True)
+                    context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+                    page = context.new_page()
+                    
+                    # Verify the browser is working
+                    page.goto('about:blank')
+                    
+                    return {
+                        'success': True,
+                        'driver': browser,
+                        'context': context,
+                        'page': page,
+                        'type': 'playwright',
+                        'browser': browser_type_name,
+                        'headless': True
+                    }
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    logging.warning(f"Failed to start Playwright with {browser_type_name}: {last_error}")
+                    
+                    # Clean up if browser was partially created
+                    if 'browser' in locals() and browser:
+                        try:
+                            browser.close()
+                        except:
+                            pass
+            
+            # If we get here, all Playwright attempts failed
+            raise RuntimeError(f"Failed to start any Playwright browser. Last error: {last_error}")
             
         except Exception as e:
             error_msg = str(e)
@@ -173,7 +239,7 @@ class WebDriverService:
             # Initialize Chrome options
             options = Options()
             
-            # Common options
+            # Common options for better compatibility
             chrome_args = [
                 '--no-sandbox',
                 '--disable-dev-shm-usage',
@@ -184,15 +250,65 @@ class WebDriverService:
                 '--disable-notifications',
                 '--disable-infobars',
                 '--disable-web-security',
-                '--disable-blink-features=AutomationControlled'
+                '--disable-blink-features=AutomationControlled',
+                '--remote-debugging-port=9222',
+                '--remote-debugging-address=0.0.0.0',
+                '--disable-browser-side-navigation',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-features=BlockInsecurePrivateNetworkRequests',
+                '--disable-web-security',
+                '--allow-running-insecure-content',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-update',
+                '--disable-default-apps',
+                '--disable-hang-monitor',
+                '--no-default-browser-check',
+                '--no-first-run',
+                '--window-size=1920,1080',
+                '--start-maximized',
+                '--ignore-certificate-errors',
+                '--ignore-ssl-errors',
+                '--disable-translate',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-zygote',
+                '--single-process',
+                '--disable-breakpad',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-default-apps',
+                '--disable-dev-shm-usage',
+                '--disable-extensions',
+                '--disable-features=TranslateUI',
+                '--disable-hang-monitor',
+                '--disable-ipc-flooding-protection',
+                '--disable-popup-blocking',
+                '--disable-prompt-on-repost',
+                '--disable-renderer-backgrounding',
+                '--disable-sync',
+                '--force-color-profile=srgb',
+                '--metrics-recording-only',
+                '--safebrowsing-disable-auto-update',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-component-update',
+                '--disable-ipc-flooding-protection',
+                '--disable-renderer-backgrounding'
             ]
             
             # Add all common arguments
             for arg in chrome_args:
-                options.add_argument(arg)
+                if arg not in ' '.join(options.arguments):
+                    options.add_argument(arg)
             
-            # Set headless mode for server environments
-            if os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true':
+            # Set headless mode for server environments or if explicitly requested
+            if (os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true' or 
+                os.environ.get('HEADLESS', 'true').lower() == 'true'):
                 options.add_argument('--headless=new')
                 options.add_argument('--window-size=1920,1080')
             

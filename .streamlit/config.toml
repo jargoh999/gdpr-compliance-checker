@@ -1,35 +1,63 @@
 [server]
-# Increase the maximum file watcher limit
-fileWatcherType = "none"
-# Disable telemetry
-gatherUsageStats = false
-# Disable CORS for local development
+# Server configuration
+port = 8501
+address = "0.0.0.0"
+headless = true
 enableCORS = false
-# Disable XSRF protection for local development
 enableXsrfProtection = false
+maxUploadSize = 1000  # Max file upload size in MB
+maxMessageSize = 200  # Max WebSocket message size in MB
 
+# Performance optimizations
+fileWatcherType = "none"  # Disable file watcher to avoid inotify limits
+browser.gatherUsageStats = false  # Disable telemetry
+runner.magicEnabled = false  # Disable magic commands
+runner.fastRerun = true  # Enable fast rerun
+browser.serverAddress = "0.0.0.0"
+
+# Scheduler configuration
+[scheduler]
+enabled = false  # Disable scheduler
+
+# Browser configuration
 [browser]
-# Disable the file watcher to avoid inotify limits
 serverAddress = "0.0.0.0"
 serverPort = 8501
 
-[runner]
+# Client configuration
+[client]
 # Disable the file watcher to avoid inotify limits
-magicEnabled = false
+showErrorDetails = true
 
-[scheduler]
-# Disable the file watcher to avoid inotify limits
+# Global configuration
+[global]
+developmentMode = false
+sharingMode = "off"
+
+# Theme configuration
+[theme]
+base = "light"
+primaryColor = "#FF4B4B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+# Browser automation settings
+[browser.server]
+# Increase timeouts for browser automation
+browserTimeout = 1800  # 30 minutes
+browserServerTimeout = 1800  # 30 minutes
+
+# Disable unnecessary features for better performance
+[browser.gatherUsageStats]
 enabled = false
 
-[global]
-# Disable the file watcher to avoid inotify limits
-developmentMode = false
+# Disable analytics
+[client.toolbarMode]
+# Disable the toolbar in production
+dev = false
 
-[theme]
-# Set the default theme
-base="light"
-primaryColor="#FF4B4B"
-backgroundColor="#FFFFFF"
-secondaryBackgroundColor="#F0F2F6"
-textColor="#262730"
-font="sans serif"
+# Disable the deploy button
+[runner.showErrorDetails]
+enabled = true

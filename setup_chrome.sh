@@ -38,55 +38,50 @@ apt-get install -qqy --no-install-recommends \
     xfonts-cyrillic \
     xserver-xorg-core \
     x11-apps \
-    dbus-x11 \
-    libgbm-dev \
-    libxshmfence-dev \
-    libasound2 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libatspi2.0-0 \
-    libx11-xcb1 \
-    libxshmfence1 \
-    libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome
-echo "Installing Google Chrome..."
-# Install required dependencies
-apt-get update -qqy
-apt-get install -y wget gnupg2
+install_chrome
 
-# Add Google Chrome repository
-wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+# Install ChromeDriver
+install_chromedriver
 
-# Install Chrome
-apt-get update -qqy
-apt-get install -y google-chrome-stable
-
-# Verify installation
-if ! command -v google-chrome &> /dev/null; then
-    echo "Google Chrome installation failed, trying alternative method..."
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    apt-get install -y ./google-chrome-stable_current_amd64.deb
-    rm google-chrome-stable_current_amd64.deb
+# Install Playwright browsers if needed
+if [ "$1" = "--with-playwright" ]; then
+    install_playwright
 fi
 
-# Clean up
-rm -f /etc/apt/sources.list.d/google-chrome.list
-rm -rf /var/lib/apt/lists/*
+# Verify installations
+echo "Verifying installations..."
 
-# Verify Chrome installation
-echo "Chrome version: $(google-chrome --version || echo 'Chrome not found')"
+# Check Chrome/Chromium
+if command -v google-chrome-stable &> /dev/null; then
+    echo "Google Chrome: $(google-chrome-stable --version)"
+elif command -v google-chrome &> /dev/null; then
+    echo "Google Chrome: $(google-chrome --version)"
+elif command -v chromium-browser &> /dev/null; then
+    echo "Chromium: $(chromium-browser --version)"
+elif command -v chromium &> /dev/null; then
+    echo "Chromium: $(chromium --version)"
+else
+    echo "Warning: No Chrome/Chromium installation found"
+fi
+
+# Check ChromeDriver
+if command -v chromedriver &> /dev/null; then
+    echo "ChromeDriver: $(chromedriver --version)"
+else
+    echo "Warning: ChromeDriver not found"
+fi
+
+# Check Playwright if installed
+if command -v playwright &> /dev/null; then
+    echo "Playwright: $(playwright --version)"
+    echo "Installed browsers:"
+    npx playwright install --dry-run
+fi
+
+echo "\nSetup completed successfully!"
+echo "If you need Playwright, run this script with --with-playwright"
 
 # Set display port and dbus env to avoid hanging
 export DISPLAY=:99.0
@@ -98,18 +93,8 @@ Xvfb :99 -screen 0 1920x1080x24 -ac +extension RANDR +render -noreset > /dev/nul
 # Wait for Xvfb
 sleep 3
 
-# Set Chrome options
-echo "Setting up ChromeDriver..."
-export CHROME_DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-wget -q "https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip" -O /tmp/chromedriver_linux64.zip
-unzip -qq /tmp/chromedriver_linux64.zip -d /usr/local/bin/
-chmod +x /usr/local/bin/chromedriver
-rm /tmp/chromedriver_linux64.zip
-
-# Install Playwright browsers
-echo "Installing Playwright browsers..."
-python -m playwright install-deps
-python -m playwright install chromium
+# Verify Chrome installation
+echo "Chrome version: $(google-chrome --version || echo 'Chrome not found')"
 
 # Verify installations
 echo "=== Installation Summary ==="
