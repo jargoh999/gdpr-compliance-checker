@@ -1,122 +1,267 @@
+"""WebDriver utility functions for browser automation."""
 import os
 import sys
 import logging
-from typing import Optional, Union, Any
+import platform
+import subprocess
+from typing import Optional, Dict, Any, Union
+
+# Selenium imports
 from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.remote.webdriver import WebDriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
-from selenium.webdriver.remote.remote_connection import LOGGER
-import subprocess
 
-# Set logger level to WARNING to reduce noise
-LOGGER.setLevel(logging.WARNING)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('webdriver.log')
+    ]
+)
+
+LOGGER = logging.getLogger(__name__)
 
 # Set logger level to WARNING to reduce noise
 LOGGER.setLevel(logging.WARNING)
 
 def is_chrome_installed() -> bool:
-    """Check if Chrome or Chromium is installed."""
-    try:
-        # Try to get Chrome version
-        chrome_version = subprocess.check_output(
-            ["google-chrome", "--version"],
-            stderr=subprocess.STDOUT
-        )
-        logging.info(f"Chrome is installed: {chrome_version.decode().strip()}")
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        try:
-            # Try chromium as fallback
-            chromium_version = subprocess.check_output(
-                ["chromium-browser", "--version"],
-                stderr=subprocess.STDOUT
-            )
-            logging.info(f"Chromium is installed: {chromium_version.decode().strip()}")
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            logging.warning("Neither Chrome nor Chromium is installed")
-            return False
-
-def get_chrome_options() -> Options:
-    """Configure Chrome/Chromium options for both local and cloud environments."""
-    chrome_options = Options()
-    
-    # Common options
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--disable-extensions')
-    chrome_options.add_argument('--disable-software-rasterizer')
-    chrome_options.add_argument('--disable-setuid-sandbox')
-    chrome_options.add_argument('--disable-notifications')
-    chrome_options.add_argument('--disable-infobars')
-    chrome_options.add_argument('--disable-web-security')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    
-    # Headless mode for server environments
-    if os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true':
-        chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--window-size=1920,1080')
-    
-    # Additional options for Linux environments
-    if sys.platform == 'linux':
-        chrome_options.add_argument('--disable-dev-shm-using')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-application-cache')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-setuid-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-    
-    return chrome_options
-
-def get_webdriver() -> WebDriver:
-    """Initialize and return a Chrome/Chromium WebDriver instance.
+    """Check if Chrome or Chromium is installed on the system.
     
     Returns:
-        WebDriver: Configured WebDriver instance
+        bool: True if Chrome or Chromium is installed, False otherwise
     """
-    options = get_chrome_options()
+    # Determine the correct command based on the platform
+    commands = []
+    if platform.system() == 'Windows':
+        commands = [
+            ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
+            ['reg', 'query', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Google Chrome', '/v', 'DisplayVersion']
+        ]
+    else:
+        commands = [
+            ['google-chrome', '--version'],
+            ['chromium-browser', '--version'],
+            ['chromium', '--version'],
+            ['/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', '--version']
+        ]
     
-    # Set headless mode for server environments
-    if os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true':
+    for cmd in commands:
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True,
+                shell=platform.system() == 'Windows'
+            )
+            version = result.stdout.strip()
+            if version:
+                LOGGER.info(f"Found browser: {version}")
+                return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    LOGGER.warning("No Chrome/Chromium installation found")
+    return False
+
+def get_chrome_options(headless: bool = None) -> Options:
+    """Get Chrome/Chromium options with common settings.
+    
+    Args:
+        headless: Whether to run in headless mode. If None, auto-detect based on environment.
+    
+    Returns:
+        Options: Configured Chrome options
+    """
+    options = Options()
+    
+    # Common Chrome options
+    chrome_args = [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-extensions',
+        '--disable-software-rasterizer',
+        '--disable-setuid-sandbox',
+        '--disable-notifications',
+        '--disable-infobars',
+        '--disable-web-security',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-browser-side-navigation',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-web-security',
+        '--disable-features=site-per-process',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-hang-monitor',
+        '--disable-prompt-on-repost',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--no-first-run',
+        '--safebrowsing-disable-auto-update',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+        '--disable-webgl',
+        '--disable-threaded-animation',
+        '--disable-threaded-scrolling',
+        '--disable-in-process-stack-traces',
+        '--disable-logging',
+        '--disable-dev-tools',
+        '--log-level=3',
+        '--output=/dev/null'
+    ]
+    
+    # Add all common arguments
+    for arg in chrome_args:
+        options.add_argument(arg)
+    
+    # Set preferences
+    prefs = {
+        'profile.default_content_setting_values.notifications': 2,
+        'credentials_enable_service': False,
+        'profile.password_manager_enabled': False,
+        'profile.default_content_settings.popups': 0,
+        'download_restrictions': 3,
+        'safebrowsing.enabled': True,
+        'profile.managed_default_content_settings.images': 2,  # Disable images
+        'profile.managed_default_content_settings.javascript': 1,  # Enable JS
+        'profile.managed_default_content_settings.cookies': 1,  # Enable cookies
+        'profile.managed_default_content_settings.plugins': 1,  # Enable plugins
+        'profile.managed_default_content_settings.popups': 0,  # Disable popups
+        'profile.managed_default_content_settings.geolocation': 0,  # Disable geolocation
+        'profile.managed_default_content_settings.media_stream': 0,  # Disable media stream
+    }
+    
+    options.add_experimental_option('prefs', prefs)
+    
+    # Set headless mode if specified or in server environment
+    if headless or (headless is None and os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true'):
         options.add_argument('--headless=new')
         options.add_argument('--window-size=1920,1080')
     
-    try:
-        # Try to use the installed Chrome/Chromium driver
-        if is_chrome_installed():
-            chrome_type = ChromeType.GOOGLE
-        else:
-            # Fall back to Chromium if Chrome is not installed
-            chrome_type = ChromeType.CHROMIUM
-            logging.info("Chrome not found, falling back to Chromium")
-            
-        service = Service(ChromeDriverManager(chrome_type=chrome_type).install())
-        driver = webdriver.Chrome(service=service, options=options)
-        
-        # In Streamlit Cloud or similar environments, use the installed Chrome
-        if os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true':
-            options.binary_location = '/usr/bin/google-chrome-stable'
-            service = Service(executable_path='/usr/local/bin/chromedriver')
-            return webdriver.Chrome(service=service, options=options)
-        
-        # For local development, use webdriver-manager
-        return webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
-    except Exception as e:
-        print(f"Error initializing WebDriver: {str(e)}")
-        raise
+    # Set binary location if available
+    if platform.system() == 'Linux':
+        chrome_paths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/usr/local/bin/chrome',
+            '/snap/bin/chromium'
+        ]
+        for path in chrome_paths:
+            if os.path.exists(path):
+                options.binary_location = path
+                break
+    
+    return options
 
-def close_webdriver(driver):
-    """Safely close the WebDriver instance."""
-    if driver:
+def get_webdriver(headless: bool = None, options: Optional[Options] = None) -> WebDriver:
+    """Initialize and return a Chrome/Chromium WebDriver instance with fallbacks.
+    
+    Args:
+        headless: Whether to run in headless mode. If None, auto-detect.
+        options: Optional pre-configured Chrome options.
+    
+    Returns:
+        WebDriver: Configured WebDriver instance
+        
+    Raises:
+        RuntimeError: If WebDriver cannot be initialized
+    """
+    if options is None:
+        options = get_chrome_options(headless)
+    
+    # Configure service
+    service_kwargs = {}
+    
+    # Try different Chrome/Chromium types
+    chrome_types = [ChromeType.GOOGLE, ChromeType.CHROMIUM]
+    
+    for chrome_type in chrome_types:
         try:
-            driver.quit()
+            LOGGER.info(f"Attempting to initialize WebDriver with {chrome_type.name}")
+            
+            # Get the appropriate ChromeDriver
+            chrome_driver_manager = ChromeDriverManager(chrome_type=chrome_type)
+            service = Service(chrome_driver_manager.install())
+            
+            # Set binary location if not set
+            if not options.binary_location:
+                if chrome_type == ChromeType.GOOGLE:
+                    if platform.system() == 'Linux':
+                        options.binary_location = '/usr/bin/google-chrome-stable'\
+                            if os.path.exists('/usr/bin/google-chrome-stable') else '/usr/bin/google-chrome'
+                    elif platform.system() == 'Darwin':
+                        options.binary_location = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                elif chrome_type == ChromeType.CHROMIUM:
+                    if platform.system() == 'Linux':
+                        options.binary_location = '/usr/bin/chromium-browser'\
+                            if os.path.exists('/usr/bin/chromium-browser') else '/usr/bin/chromium'
+            
+            LOGGER.info(f"Using Chrome binary: {options.binary_location or 'default'}")
+            
+            # Initialize WebDriver
+            driver = webdriver.Chrome(service=service, options=options)
+            
+            # Set a reasonable window size if not headless
+            if not (headless or (headless is None and os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true')):
+                driver.set_window_size(1920, 1080)
+            
+            LOGGER.info("WebDriver initialized successfully")
+            return driver
+            
         except Exception as e:
-            print(f"Error closing WebDriver: {str(e)}")
+            LOGGER.warning(f"Failed to initialize WebDriver with {chrome_type.name}: {str(e)}")
+            continue
+    
+    # If we get here, all attempts failed
+    error_msg = "Failed to initialize WebDriver with any Chrome/Chromium version"
+    LOGGER.error(error_msg)
+    raise RuntimeError(error_msg)
+
+def close_webdriver(driver: WebDriver) -> None:
+    """Safely close the WebDriver instance.
+    
+    Args:
+        driver: WebDriver instance to close
+    """
+    if not driver:
+        return
+        
+    try:
+        # Try to close all windows and quit
+        if hasattr(driver, 'window_handles'):
+            for handle in driver.window_handles:
+                try:
+                    driver.switch_to.window(handle)
+                    driver.close()
+                except Exception as e:
+                    LOGGER.warning(f"Error closing window {handle}: {str(e)}")
+        
+        # Try to quit the driver
+        if hasattr(driver, 'quit'):
+            driver.quit()
+            
+    except Exception as e:
+        LOGGER.warning(f"Error closing WebDriver: {str(e)}")
+        
+    finally:
+        try:
+            # Try to kill any remaining Chrome/Chromium processes
+            if platform.system() == 'Windows':
+                os.system('taskkill /f /im chrome.exe /t >nul 2>&1')
+                os.system('taskkill /f /im chromedriver.exe /t >nul 2>&1')
+            else:
+                os.system('pkill -f "(chrome|chromium|chromedriver)" >/dev/null 2>&1')
+        except Exception as e:
+            LOGGER.debug(f"Error cleaning up processes: {str(e)}")
