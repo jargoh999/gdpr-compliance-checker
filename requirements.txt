@@ -1,40 +1,36 @@
 # Core dependencies
-streamlit==1.24.0
-python-dotenv==1.0.0
-beautifulsoup4==4.12.2
-requests==2.31.0
-tldextract==5.1.1
-pandas==2.0.3
-ruamel.yaml==0.17.32  # Replaced PyYAML with ruamel.yaml
-python-whois==0.9.3
+streamlit>=1.24.0
+python-dotenv>=1.0.0
+beautifulsoup4>=4.12.2
+requests>=2.31.0
+tldextract>=5.1.1
+pandas>=2.0.3
+ruamel.yaml>=0.17.32
+python-whois>=0.9.3
 
 # Browser automation
-selenium==4.10.0
-webdriver-manager==3.8.6
-playwright==1.35.0  # For fallback browser automation
-selenium-wire==5.1.0
+selenium>=4.10.0
+webdriver-manager>=3.8.6
+playwright>=1.35.0
+selenium-wire>=5.1.0
 
 # PDF generation
-fpdf2==2.7.5
+fpdf2>=2.7.5
 
 # Database and utilities
-SQLAlchemy==2.0.19
-greenlet==2.0.2  # Explicit version for Python 3.11 compatibility
+SQLAlchemy>=2.0.19
+greenlet>=2.0.2
 
 # DNS and network
-dnspython==2.4.2
+dnspython>=2.4.2
 
 # Testing
-pytest==7.4.0
-
-# System dependencies for headless browser
-# These are installed in the Dockerfile/container environment
-# xvfbwrapper==0.2.9
-# pyvirtualdisplay==3.0.0
-
-# Playwright browsers (will be installed automatically by Playwright)
-# playwright install chromium
+pytest>=7.4.0
 
 # Streamlit Cloud specific
-cryptography==41.0.2  # Required by Streamlit Cloud
-pyOpenSSL==23.2.0  # Required by Streamlit Cloud
+cryptography>=41.0.2
+pyOpenSSL>=23.2.0
+
+# Additional dependencies for headless browser
+pyvirtualdisplay>=3.0.0
+xvfbwrapper>=0.2.9
