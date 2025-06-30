@@ -10,7 +10,7 @@ python-whois>=0.9.3
 
 # Browser automation
 selenium>=4.10.0
-webdriver-manager>=3.8.6
+webdriver-manager>=4.0.0  # Updated for better ChromeDriver management
 playwright>=1.35.0
 selenium-wire>=5.1.0
 
@@ -34,3 +34,15 @@ pyOpenSSL>=23.2.0
 # Additional dependencies for headless browser
 pyvirtualdisplay>=3.0.0
 xvfbwrapper>=0.2.9
+
+# System dependencies for browser automation
+pyppeteer>=1.0.2  # Additional browser automation option
+
+# Logging and debugging
+loguru>=0.7.0  # Better logging
+
+# Process management
+psutil>=5.9.5  # For process management
+
+# For better subprocess handling
+sh>=2.0.0

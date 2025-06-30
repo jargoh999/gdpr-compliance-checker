@@ -60,42 +60,65 @@ sudo apt-get install -y --no-install-recommends \
     libnss3 \
     lsb-release \
     xdg-utils \
+    libnss3-tools \
+    libgbm-dev \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-xinerama0 \
     --no-install-suggests \
     --no-install-recommends
 
 # Install Chrome
 echo "Installing Google Chrome..."
-wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list \
-    && sudo apt-get update -qq \
-    && sudo apt-get install -y google-chrome-stable --no-install-recommends
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-archive-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt-get update -qq
+sudo apt-get install -y google-chrome-stable --no-install-recommends
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # Install Playwright and its dependencies
 echo "Installing Playwright and browsers..."
 pip install playwright
-playwright install --with-deps
-playwright install-deps
-playwright install chromium
+python -m playwright install --with-deps
+python -m playwright install-deps
+python -m playwright install chromium
+python -m playwright install firefox
+python -m playwright install webkit
+
+# Create necessary directories
+echo "Creating required directories..."
+mkdir -p ~/.cache/ms-playwright
+chmod -R 777 ~/.cache/ms-playwright
 
 # Set environment variables
 export DISPLAY=:99
 export CHROME_BIN=/usr/bin/google-chrome
-export CHROME_PATH=/usr/lib/chromium-browser/
+export CHROME_PATH=/usr/bin/google-chrome
+export PLAYWRIGHT_BROWSERS_PATH=~/ms-playwright
 
 # Start Xvfb in the background
 echo "Starting Xvfb..."
 Xvfb :99 -screen 0 1920x1080x16 &
 
 # Verify installations
-echo "Verifying installations..."
+echo "=== Verifying installations... ==="
 which google-chrome
-google-chrome --version
-python -c "from webdriver_manager.chrome import ChromeDriverManager; print(ChromeDriverManager().install())"
-python -c "from playwright.sync_api import sync_playwright; print('Playwright version:', sync_playwright().start().version)"
+echo "Chrome version:" && google-chrome --version
+
+echo "=== ChromeDriver installation... ==="
+python -c "from webdriver_manager.chrome import ChromeDriverManager; print('ChromeDriver path:', ChromeDriverManager().install())"
+
+echo "=== Playwright browsers... ==="
+python -c "from playwright.sync_api import sync_playwright; print('Playwright browsers:'); [print(browser) for browser in sync_playwright().start().browsers]"
+
+echo "=== Environment variables... ==="
+printenv | grep -E 'CHROME|PLAYWRIGHT|DISPLAY|PATH'
 
 echo "=== Setup completed successfully! ==="
