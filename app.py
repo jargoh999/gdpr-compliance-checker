@@ -183,6 +183,15 @@ class GDPRComplianceChecker:
         """Generate a PDF report from the check results"""
         return self.pdf_generator.generate_report(report)
     
+    def cleanup(self) -> None:
+        """Clean up resources including WebDriver instances"""
+        try:
+            if hasattr(self, 'web_driver_service') and self.web_driver_service:
+                self.web_driver_service.quit_driver()
+                logger.info("Successfully cleaned up WebDriver resources")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+    
 def main():
     """Main application entry point"""
     # Main header with project title
