@@ -124,6 +124,9 @@ class WebDriverService:
         Raises:
             RuntimeError: If no WebDriver can be started
         """
+        # Initialize last_error to avoid reference before assignment
+        last_error = None
+        
         # Close existing driver if any
         if self.driver:
             try:
@@ -132,44 +135,62 @@ class WebDriverService:
             except Exception as e:
                 logger.warning(f"Error quitting existing driver: {e}")
         
-        # Ensure browser setup is complete
-        if not ensure_browser_setup():
-            logger.warning("Browser setup check failed, attempting to continue anyway...")
+        # Try to ensure browser setup is complete, but continue even if it fails
+        try:
+            if not ensure_browser_setup():
+                logger.warning("Browser setup check failed, attempting to continue anyway...")
+        except Exception as e:
+            logger.warning(f"Browser setup check failed with error: {e}")
         
-        # Get Chrome version for logging
-        chrome_version = self._get_chrome_version()
-        if chrome_version:
-            logger.info(f"Using Chrome version: {chrome_version}")
-        else:
-            logger.warning("Could not determine Chrome version")
+        # Get Chrome version for logging (but don't fail if this doesn't work)
+        try:
+            chrome_version = self._get_chrome_version()
+            if chrome_version:
+                logger.info(f"Using Chrome version: {chrome_version}")
+            else:
+                logger.warning("Could not determine Chrome version")
+        except Exception as e:
+            logger.warning(f"Error getting Chrome version: {e}")
         
         # Get configured options
-        driver_options = self._get_webdriver_options(options)
-        logger.info(f"Starting WebDriver with options: {driver_options}")
+        try:
+            driver_options = self._get_webdriver_options(options)
+            logger.info(f"Starting WebDriver with options: {driver_options}")
+        except Exception as e:
+            logger.error(f"Error configuring WebDriver options: {e}")
+            driver_options = self._get_webdriver_options({})  # Fall back to defaults
         
         # Attempt to start Chrome WebDriver with retries
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 # Use our utility function to get a Chrome WebDriver
-                self.driver = get_chrome_driver(headless=driver_options.get('headless', True))
+                self.driver = get_chrome_driver(
+                    headless=driver_options.get('headless', True),
+                    options=driver_options
+                )
                 
                 if self.driver:
                     # Set a default window size
-                    self.driver.set_window_size(1920, 1080)
-                    logger.info("Successfully started WebDriver")
-                    return self.driver
+                    try:
+                        self.driver.set_window_size(1920, 1080)
+                        logger.info("Successfully started WebDriver")
+                        return self.driver
+                    except Exception as e:
+                        logger.warning(f"Error setting window size: {e}")
+                        # Continue with the driver even if window size couldn't be set
+                        return self.driver
                 
             except Exception as e:
                 last_error = e
                 logger.warning(f"WebDriver attempt {attempt + 1}/{max_retries} failed: {e}")
                 
                 # Clean up any partially started driver
-                if self.driver:
+                if hasattr(self, 'driver') and self.driver:
                     try:
                         self.driver.quit()
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Error during driver cleanup: {e}")
                     self.driver = None
                 
                 # Add a small delay before retry
@@ -177,14 +198,48 @@ class WebDriverService:
                     wait_time = (attempt + 1) * 2  # Exponential backoff
                     logger.info(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
-                continue
-        
+                
         # If we get here, all attempts failed
         error_msg = "Failed to start WebDriver after multiple attempts. "
         if last_error:
             error_msg += f"Last error: {type(last_error).__name__}: {str(last_error)}"
+        else:
+            error_msg += "No specific error information available."
         
         logger.error(error_msg)
+        
+        # Try to start Playwright as a fallback
+        try:
+            logger.info("Attempting to start Playwright as fallback...")
+            from playwright.sync_api import sync_playwright
+            
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+                page = context.new_page()
+                
+                # Create a wrapper to make it compatible with Selenium-like interface
+                class PlaywrightWrapper:
+                    def __init__(self, browser, context, page):
+                        self.browser = browser
+                        self.context = context
+                        self.page = page
+                    
+                    def get(self, url):
+                        return self.page.goto(url)
+                        
+                    def quit(self):
+                        self.context.close()
+                        self.browser.close()
+                
+                self.driver = PlaywrightWrapper(browser, context, page)
+                logger.info("Successfully started Playwright as fallback")
+                return self.driver
+                
+        except Exception as e:
+            logger.error(f"Failed to start Playwright fallback: {e}")
+            
+        # If we get here, all fallbacks failed
         raise RuntimeError(error_msg)
     
     def _try_start_webdriver(self, options: Optional[Dict[str, Any]], headless: bool = True) -> dict:
@@ -345,14 +400,47 @@ class WebDriverService:
         """Get Chrome/Chromium options with default and custom settings
         
         Args:
-            custom_options: Custom options to override defaults
-            
+            custom_options: Custom options to override defaults. Can include:
+                         - 'args': List of additional command-line arguments
+                         - 'prefs': Dictionary of preferences
+                         - 'experimental_options': Dictionary of experimental options
+                         - 'headless': Boolean to force headless mode
+                         - 'window_size': Tuple of (width, height) for window size
+                         
         Returns:
             Options: Configured Chrome/Chromium options
         """
         try:
             # Initialize Chrome options
             options = Options()
+            
+            # Parse custom options
+            custom_args = []
+            prefs = {}
+            experimental_options = {}
+            force_headless = None
+            window_size = '1920,1080'
+            
+            if custom_options:
+                # Handle headless mode
+                if 'headless' in custom_options:
+                    force_headless = bool(custom_options['headless'])
+                
+                # Handle window size
+                if 'window_size' in custom_options and isinstance(custom_options['window_size'], (tuple, list)) and len(custom_options['window_size']) == 2:
+                    window_size = f"{custom_options['window_size'][0]},{custom_options['window_size'][1]}"
+                
+                # Handle additional command-line arguments
+                if 'args' in custom_options and isinstance(custom_options['args'], list):
+                    custom_args = custom_options['args']
+                
+                # Handle preferences
+                if 'prefs' in custom_options and isinstance(custom_options['prefs'], dict):
+                    prefs.update(custom_options['prefs'])
+                
+                # Handle experimental options
+                if 'experimental_options' in custom_options and isinstance(custom_options['experimental_options'], dict):
+                    experimental_options.update(custom_options['experimental_options'])
             
             # Common options for better compatibility
             chrome_args = [
@@ -372,7 +460,6 @@ class WebDriverService:
                 '--disable-features=IsolateOrigins,site-per-process',
                 '--disable-site-isolation-trials',
                 '--disable-features=BlockInsecurePrivateNetworkRequests',
-                '--disable-web-security',
                 '--allow-running-insecure-content',
                 '--disable-client-side-phishing-detection',
                 '--disable-component-update',
@@ -380,7 +467,7 @@ class WebDriverService:
                 '--disable-hang-monitor',
                 '--no-default-browser-check',
                 '--no-first-run',
-                '--window-size=1920,1080',
+                f'--window-size={window_size}',
                 '--start-maximized',
                 '--ignore-certificate-errors',
                 '--ignore-ssl-errors',
@@ -392,43 +479,47 @@ class WebDriverService:
                 '--no-zygote',
                 '--single-process',
                 '--disable-breakpad',
-                '--disable-client-side-phishing-detection',
                 '--disable-component-extensions-with-background-pages',
-                '--disable-default-apps',
-                '--disable-dev-shm-usage',
-                '--disable-extensions',
                 '--disable-features=TranslateUI',
-                '--disable-hang-monitor',
                 '--disable-ipc-flooding-protection',
                 '--disable-popup-blocking',
                 '--disable-prompt-on-repost',
                 '--disable-renderer-backgrounding',
-                '--disable-sync',
                 '--force-color-profile=srgb',
-                '--metrics-recording-only',
                 '--safebrowsing-disable-auto-update',
                 '--password-store=basic',
                 '--use-mock-keychain',
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
-                '--disable-component-update',
                 '--disable-ipc-flooding-protection',
-                '--disable-renderer-backgrounding'
+                '--disable-renderer-backgrounding',
+                '--disable-dev-shm-usage',
+                '--disable-extensions'
             ]
             
-            # Add all common arguments
+            # Add custom arguments
+            if custom_args:
+                chrome_args.extend(arg for arg in custom_args if arg not in chrome_args)
+            
+            # Add all arguments to options
+            existing_args = set(options.arguments)
             for arg in chrome_args:
-                if arg not in ' '.join(options.arguments):
+                if arg.split('=')[0] not in [a.split('=')[0] for a in existing_args]:
                     options.add_argument(arg)
             
-            # Set headless mode for server environments or if explicitly requested
-            if (os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true' or 
-                os.environ.get('HEADLESS', 'true').lower() == 'true'):
-                options.add_argument('--headless=new')
-                options.add_argument('--window-size=1920,1080')
+            # Set headless mode if needed
+            headless_env = os.environ.get('HEADLESS', 'true').lower() == 'true'
+            is_streamlit = os.environ.get('STREAMLIT_SERVER_RUNNING', '').lower() == 'true'
             
-            # Default preferences
-            prefs = {
+            if force_headless is None:
+                force_headless = headless_env or is_streamlit
+            
+            if force_headless:
+                options.add_argument('--headless=new')
+                options.add_argument(f'--window-size={window_size}')
+            
+            # Set default preferences if not overridden
+            default_prefs = {
                 'profile.password_manager_enabled': False,
                 'profile.default_content_setting_values.notifications': 2,
                 'credentials_enable_service': False,

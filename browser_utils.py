@@ -1,7 +1,9 @@
 """Utility functions for browser initialization and management."""
 import os
 import logging
+import random
 import subprocess
+import time
 from typing import Optional, Dict, Any
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -49,40 +51,56 @@ def setup_chrome_options(headless: bool = True) -> ChromeOptions:
     
     return options
 
-def get_chrome_driver(headless: bool = True) -> Optional[webdriver.Chrome]:
+def get_chrome_driver(headless: bool = True, options: Optional[Dict[str, Any]] = None) -> Optional[webdriver.Chrome]:
     """Get a Chrome WebDriver instance with retry logic.
     
     Args:
         headless: Whether to run in headless mode
+        options: Additional Chrome options to apply
         
     Returns:
         Configured WebDriver instance or None if failed
     """
     max_retries = 3
-    for attempt in range(max_retries):
+    
+    for attempt in range(1, max_retries + 1):
         try:
-            # Set up Chrome options
-            options = setup_chrome_options(headless)
+            # Set up base Chrome options
+            chrome_options = setup_chrome_options(headless)
             
-            # Configure ChromeDriver
-            service = ChromeService(ChromeDriverManager().install())
+            # Apply any additional options
+            if options:
+                for key, value in options.items():
+                    if isinstance(value, bool) and value:
+                        chrome_options.add_argument(f'--{key}')
+                    elif isinstance(value, str):
+                        chrome_options.add_argument(f'--{key}={value}')
             
-            # Initialize WebDriver
-            driver = webdriver.Chrome(service=service, options=options)
-            driver.set_page_load_timeout(30)
-            
-            logger.info("Successfully initialized Chrome WebDriver")
-            return driver
-            
+            # Set up service with ChromeDriverManager
+            try:
+                service = ChromeService(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                logger.info("Successfully started Chrome WebDriver")
+                return driver
+            except Exception as e:
+                logger.warning(f"Failed to use ChromeDriverManager (attempt {attempt}/{max_retries}): {e}")
+                # Fall back to system ChromeDriver
+                try:
+                    driver = webdriver.Chrome(options=chrome_options)
+                    logger.info("Successfully started Chrome WebDriver using system ChromeDriver")
+                    return driver
+                except Exception as fallback_error:
+                    logger.warning(f"System ChromeDriver fallback failed: {fallback_error}")
+                    raise  # Re-raise to trigger retry
+                
         except Exception as e:
-            logger.warning(f"Attempt {attempt + 1} failed to initialize Chrome WebDriver: {e}")
-            if attempt == max_retries - 1:
+            logger.warning(f"Attempt {attempt}/{max_retries} failed: {e}")
+            if attempt == max_retries:
                 logger.error("Max retries reached, giving up on Chrome WebDriver")
                 return None
             
-            # Wait before retry
-            import time
-            time.sleep(2 ** attempt)  # Exponential backoff
+            # Exponential backoff before retry with jitter
+            time.sleep((2 ** attempt) + (random.random() * 2))  # Add random jitter
     
     return None
 
